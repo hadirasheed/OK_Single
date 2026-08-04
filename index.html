@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>OneKilo — Patient Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#E7E5DE}
+  a{color:#4E7B4E;text-decoration:none}
+  button{font-family:inherit;cursor:pointer}
+  input{font-family:inherit}
+  .ms{font-family:'Material Symbols Rounded';line-height:1;-webkit-font-feature-settings:'liga';font-feature-settings:'liga'}
+  .scr{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .scr::-webkit-scrollbar{width:0}
+  .hx{overflow-x:auto}
+  .hx::-webkit-scrollbar{height:0}
+  .hd{font-family:'Poppins',sans-serif;letter-spacing:-.02em}
+  #root{font-family:'Inter',sans-serif;color:#1A1A17}
+  input[type=range]{accent-color:#5C7A5C;height:26px}
+  @keyframes okSlide{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+  @keyframes okFade{from{opacity:0}to{opacity:1}}
+  @keyframes okRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes okSheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes okPop{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/plain" id="appsrc">
+const { useState, useRef } = React;
+const Ic = ({n, s, c, ...r}) => <span className="ms" style={{fontSize:s||22, color:c, ...(r.style||{})}}>{n}</span>;
+
+// ---------- shared style helpers ----------
+const seg = on => ({flex:1,border:'none',borderRadius:13,padding:'11px 0',fontSize:13,transition:'all .18s',background:on?'#fff':'transparent',color:on?'#1A1A17':'#9A958A',fontWeight:on?600:500,boxShadow:on?'0 1px 4px rgba(0,0,0,.08)':'none'});
+const slotSt = on => ({borderRadius:14,padding:'11px 18px',fontSize:14,transition:'all .18s',background:on?'#1A1A17':'#fff',color:on?'#fff':'#1A1A17',border:'1px solid '+(on?'#1A1A17':'#EDEAE2'),fontWeight:on?600:500});
+const dateSt = on => ({flexShrink:0,width:58,borderRadius:18,padding:'12px 0',textAlign:'center',transition:'all .18s',background:on?'#1A1A17':'#fff',color:on?'#fff':'#1A1A17',border:'1px solid '+(on?'#1A1A17':'#EDEAE2')});
+const optRow = on => ({display:'flex',alignItems:'center',gap:12,cursor:'pointer',transition:'all .16s',borderRadius:18,padding:'16px 18px',background:on?'#EAF1E7':'#fff',border:'1.5px solid '+(on?'#5C7A5C':'#EDEAE2')});
+const tog = on => ({track:{width:48,height:28,borderRadius:99,padding:3,display:'flex',alignItems:'center',cursor:'pointer',transition:'background .22s',flexShrink:0,background:on?'#5C7A5C':'#DBD6CC'},knob:{width:22,height:22,borderRadius:'50%',background:'#fff',transition:'transform .22s cubic-bezier(.4,0,.2,1)',transform:'translateX('+(on?'20px':'0')+')'}});
+const vstep = st => {const done=st==='done',active=st==='active';return {dot:{width:34,height:34,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:done?'#fff':active?'#46603F':'#C9C4B8',background:done?'#5C7A5C':active?'#EAF1E7':'#F0EEE7',border:done?'none':(active?'2px solid #5C7A5C':'1px solid #E2DED3')},titleColor:done||active?'#1A1A17':'#9A958A',lineColor:done?'#5C7A5C':'#E2DED3'};};
+const pillBtn = {width:'100%',background:'#1A1A17',color:'#fff',border:'none',borderRadius:99,padding:18,fontSize:16,fontWeight:600,transition:'transform .12s'};
+const card = {background:'#fff',border:'1px solid #EDEAE2',borderRadius:24,padding:22};
+const kicker = {fontSize:14,color:'#9A958A',fontWeight:600,marginBottom:6};
+const AVATAR = 'radial-gradient(circle at 32% 28%,#8FB98F,#4E7B4E 78%)';
+
+// ---------- BMI ----------
+function bmiInfo(weight,height){
+  const h=(parseFloat(height)||0)/100, w=parseFloat(weight)||0;
+  const n = h>0 ? w/(h*h) : 0;
+  let label='Healthy weight', color='#46603F';
+  if(n<18.5){label='Underweight';color='#B57A28';}
+  else if(n<25){label='Healthy weight';color='#46603F';}
+  else if(n<30){label='Overweight';color='#C55A43';}
+  else {label='Obese';color='#C55A43';}
+  return {n, bmi:n.toFixed(1), label, color, eligible:n>=25};
+}
+
+// ---------- onboarding question data ----------
+const QMAP = {
+ 1:{kicker:'Step 2 · Question 1 of 4',heading:'What brings you here?',title:'What is your primary motivation right now?',subtitle:'This helps us customize your physician care plan.',field:'motivation',multi:false,opts:[
+   ['wf','Weight & Fat Loss','Shedding weight and keeping it off long-term'],
+   ['ac','Appetite & Craving Control','Managing constant hunger, snacking, or overeating'],
+   ['ej','Energy & Joint Comfort','Reducing body aches, stiffness, and chronic fatigue'],
+   ['wb','Overall Wellbeing & Confidence','Feeling healthier, lighter, and more active daily'],
+   ['mb','Metabolic & Blood Sugar Health','Managing Diabetes, PCOS, or Thyroid concerns']]},
+ 2:{kicker:'Step 2 · Question 2 of 4',heading:'What brings you here?',title:'How much weight are you aiming to lose?',subtitle:'',field:'weightGoal',multi:false,opts:[
+   ['g1','5 – 10 kg','Mild to moderate reduction'],
+   ['g2','10 – 20 kg','Significant metabolic transformation'],
+   ['g3','20+ kg','Comprehensive health reset']]},
+ 3:{kicker:'Step 2 · Question 3 of 4',heading:'What brings you here?',title:'Where would you like us to focus first?',subtitle:'All OneKilo programs include our full medical, diet, and coaching team. This simply sets your initial care priority.',field:'focus',multi:false,opts:[
+   ['dm','Doctor & Medication Focus','Safe medical evaluation & prescription management'],
+   ['dn','Custom Diet & Nutrition','Structured meal planning paired with doctor care'],
+   ['hl','Habit & Lifestyle Coaching','Support for cravings, routines, and accountability'],
+   ['ar','Accelerated Reset','High-intensity momentum for the first 30 days'],
+   ['cc','360° Complete Care','Full-team onboarding — doctor, diet, mobility & psychological support']]},
+ 4:{kicker:'Step 2 · Question 4 of 4',heading:'What brings you here?',title:'How would you describe your daily movement?',subtitle:'',field:'movement',multi:false,opts:[
+   ['m1','Mostly Sedentary','Desk job, minimal walking (< 3,000 steps/day)'],
+   ['m2','Lightly Active','Occasional walks or standing tasks (~3,000–6,000 steps/day)'],
+   ['m3','Moderately Active','Workouts 2–3× a week (~6,000–10,000 steps/day)'],
+   ['m4','Highly Active','On your feet all day or daily exercise (> 10,000 steps/day)']]},
+ 5:{kicker:'Step 3 · Question 1 of 2',heading:'A bit about your health',title:'Are you currently managing or taking medication for any of these?',subtitle:'Select all that apply.',field:'medical',multi:true,opts:[
+   ['diab','Diabetes / Pre-diabetes',''],['thy','Thyroid disorders',''],['gi','Gastrointestinal / Gastric issues',''],['bp','High blood pressure / Cholesterol',''],['none','None of the above','']]},
+ 6:{kicker:'Step 3 · Question 2 of 2',heading:'A bit about your health',title:'Have you previously used prescription weight-loss treatments?',subtitle:'Including Ozempic, Wegovy, Mounjaro, or oral weight-loss drugs.',field:'prevMed',multi:false,opts:[
+   ['p1','No, this is my first time',''],['p2','Yes, currently taking weight-loss medication',''],['p3','Yes, taken in the past (currently stopped)','']]},
+};
+
+const NAV = [
+  {key:'home',label:'Home',icon:'home'},{key:'appointments',label:'Appointments',icon:'calendar_month'},
+  {key:'lab',label:'Lab',icon:'science'},{key:'medication',label:'Medication',icon:'medication'},
+  {key:'progress',label:'Progress',icon:'monitoring'},{key:'notifications',label:'Notifications',icon:'notifications'},
+  {key:'profile',label:'Profile',icon:'person'},
+];
+const STAGES = [
+  {kicker:'Your first consult',cardTitle:'Consult confirmed',cardBody:'Meet your OneKilo physician over video. They’ll assess your fit and next steps.',hasMeta:true,cta:'Mark consult complete →'},
+  {kicker:'Next step',cardTitle:'Your 3-month program',cardBody:'Specialist care, home labs, and monthly medication.',hasMeta:false,cta:'Purchase program'},
+  {kicker:'Month 1 of 3',cardTitle:'Home lab collection',cardBody:'A collector visits your home — included in your program at no extra charge.',hasMeta:false,cta:'Book lab collection'},
+  {kicker:'Results are in',cardTitle:'Time to review results',cardBody:'Your specialist will go over your results and set your medication plan.',hasMeta:true,cta:'Book second consult'},
+];
+const ADDRESS = 'Ponoth Road, Kaloor, Kochi, Kerala 682017';
+
+// ================= APP =================
+function App(){
+  const [phase,setPhase]=useState('onboard');      // onboard | success | payment | app
+  const [pg,setPg]=useState(0);                     // onboarding page 0..8
+  const [otpOpen,setOtpOpen]=useState(false); const [otp,setOtp]=useState('');
+  const [route,setRoute]=useState('home'); const [stage,setStage]=useState(0);
+  const [drawer,setDrawer]=useState(false);
+  const [apptTab,setApptTab]=useState('upcoming'); const [profileTab,setProfileTab]=useState('personal');
+  const [gender,setGender]=useState('Male');
+  const [age,setAge]=useState(34); const [weight,setWeight]=useState(88); const [height,setHeight]=useState(170);
+  const [ans,setAns]=useState({motivation:'',weightGoal:'',focus:'',movement:'',medical:[],prevMed:''});
+  const [pincode,setPincode]=useState(''); const [pinChecked,setPinChecked]=useState(false);
+  const [consultDate,setConsultDate]=useState('23'); const [consultSlot,setConsultSlot]=useState('2:30 PM');
+  const [labDate,setLabDate]=useState('25'); const [labSlot,setLabSlot]=useState('Morning · 9–11 AM');
+  const [waNotif,setWaNotif]=useState(true); const [copied,setCopied]=useState(false);
+  const [notif,setNotif]=useState({appt_wa:true,appt_app:true,lab_wa:true,lab_app:false,del_wa:true,del_app:true,rev_wa:true,rev_app:false});
+  const advTimer=useRef(); const copyTimer=useRef();
+
+  const go=r=>{setRoute(r);setDrawer(false);};
+  const next=()=>setPg(p=>Math.min(p+1,8));
+  const chooseAdvance=(field,val)=>{setAns(a=>({...a,[field]:val}));clearTimeout(advTimer.current);advTimer.current=setTimeout(next,240);};
+  const toggleMedical=k=>setAns(a=>{if(k==='none')return{...a,medical:a.medical.includes('none')?[]:['none']};let arr=a.medical.filter(x=>x!=='none');arr=arr.includes(k)?arr.filter(x=>x!==k):[...arr,k];return{...a,medical:arr};});
+  const onPin=v=>{setPincode((v.match(/\d/g)||[]).join('').slice(0,6));setPinChecked(false);};
+  const checkPin=()=>{if(pincode.length>=6)setPinChecked(true);};
+  const onOtp=v=>setOtp((v.match(/\d/g)||[]).join('').slice(0,4));
+  const verifyOtp=()=>{if(otp.length>=4){setOtpOpen(false);setPhase('success');}};
+  const copyMeet=()=>{setCopied(true);clearTimeout(copyTimer.current);copyTimer.current=setTimeout(()=>setCopied(false),1600);};
+  const advance=()=>setStage(s=>Math.min(s+1,3));
+  const confirmLab=()=>{setStage(s=>Math.min(s+1,3));setRoute('lab');};
+  const b=bmiInfo(weight,height);
+
+  return (
+    <div style={{display:'flex',justifyContent:'center',minHeight:'100vh',background:'#E7E5DE'}}>
+      <div style={{width:'100%',maxWidth:440,minHeight:'100vh',height:'100vh',background:'#F6F5F1',display:'flex',flexDirection:'column',position:'relative',overflow:'hidden',boxShadow:'0 0 60px rgba(0,0,0,.12)'}}>
+
+        {phase==='onboard' && <Onboard {...{pg,setPg,next,gender,setGender,age,setAge,weight,setWeight,height,setHeight,b,ans,chooseAdvance,toggleMedical,pincode,onPin,pinChecked,checkPin,consultDate,setConsultDate,consultSlot,setConsultSlot,otpOpen,setOtpOpen,otp,onOtp,verifyOtp}} />}
+
+        {phase==='success' && <Success onNext={()=>setPhase('payment')} />}
+
+        {phase==='payment' && <Payment onBack={()=>setPhase('success')} onPay={()=>{setPhase('app');setRoute('home');setStage(0);}} />}
+
+        {phase==='app' && <AppShell {...{route,go,stage,drawer,setDrawer,apptTab,setApptTab,profileTab,setProfileTab,advance,confirmLab,labDate,setLabDate,labSlot,setLabSlot,waNotif,setWaNotif,copied,copyMeet,notif,setNotif}} />}
+
+      </div>
+    </div>
+  );
+}
+
+// ================= ONBOARDING =================
+function Onboard(p){
+  const {pg,next,b}=p;
+  const isQ = pg>=1 && pg<=6;
+  const Q = isQ ? QMAP[pg] : null;
+  let footer=null;
+  if(pg===0) footer={label:'Continue',action:next};
+  else if(isQ && Q.multi) footer={label:'Continue',action:next};
+  else if(pg===7) footer={label:p.pinChecked?'Continue':'Check availability',action:p.pinChecked?next:p.checkPin};
+  else if(pg===8) footer={label:'Book consult',action:()=>p.setOtpOpen(true)};
+
+  return (<>
+    <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 20px 6px',flexShrink:0}}>
+      {pg>0 && <button onClick={()=>p.setPg(x=>Math.max(x-1,0))} style={{width:38,height:38,borderRadius:'50%',border:'none',background:'#EDEBE4',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="arrow_back" s={22} c="#1A1A17"/></button>}
+      <div style={{flex:1,height:5,background:'#E2DFD6',borderRadius:99,overflow:'hidden'}}><div style={{height:'100%',background:'#1A1A17',borderRadius:99,transition:'width .45s cubic-bezier(.4,0,.2,1)',width:((pg+1)/9*100)+'%'}}/></div>
+    </div>
+
+    <div className="scr" style={{flex:1,padding:'14px 22px 40px'}}>
+      {pg===0 && <EligStep {...p} b={b} />}
+      {isQ && <QuestionStep key={pg} Q={Q} ans={p.ans} choose={p.chooseAdvance} toggleMedical={p.toggleMedical} />}
+      {pg===7 && <PinStep pincode={p.pincode} onPin={p.onPin} pinChecked={p.pinChecked} />}
+      {pg===8 && <ConsultStep consultDate={p.consultDate} setConsultDate={p.setConsultDate} consultSlot={p.consultSlot} setConsultSlot={p.setConsultSlot} />}
+    </div>
+
+    {footer && <div style={{flexShrink:0,padding:'14px 22px calc(20px + env(safe-area-inset-bottom))',background:'linear-gradient(180deg,rgba(246,245,241,0),#F6F5F1 34%)'}}>
+      <button onClick={footer.action} style={pillBtn}>{footer.label}</button>
+    </div>}
+
+    {p.otpOpen && <OtpSheet otp={p.otp} onOtp={p.onOtp} verify={p.verifyOtp} close={()=>p.setOtpOpen(false)} />}
+  </>);
+}
+
+function EligStep(p){
+  const {b}=p;
+  const Slider=({label,val,set,min,max,unit})=>(
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:5}}><label style={{fontSize:13,fontWeight:600,color:'#57534A'}}>{label}</label><span className="hd" style={{fontSize:18,fontWeight:700}}>{val} <span style={{fontSize:11,color:'#9A958A',fontWeight:500}}>{unit}</span></span></div>
+      <input type="range" min={min} max={max} value={val} onChange={e=>set(+e.target.value)} style={{width:'100%',display:'block',margin:0}}/>
+    </div>);
+  const Seg=({g})=><button onClick={()=>p.setGender(g)} style={seg(p.gender===g)}>{g}</button>;
+  return (
+    <div style={{animation:'okRise .4s ease both'}}>
+      <div style={kicker}>Step 1 · Eligibility</div>
+      <h1 className="hd" style={{fontSize:32,fontWeight:700,lineHeight:1.06,margin:'0 0 24px'}}>Let's check<br/>your eligibility</h1>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Full name</label><input defaultValue="Rahul Nair" style={{width:'100%',border:'1px solid #EDEAE2',background:'#fff',borderRadius:16,padding:'15px 16px',fontSize:15}}/></div>
+        <div><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Gender</label>
+          <div style={{display:'flex',background:'#EDEBE4',borderRadius:16,padding:4,gap:3}}><Seg g="Male"/><Seg g="Female"/><Seg g="Other"/></div>
+        </div>
+        <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:16,padding:'16px 18px',display:'flex',flexDirection:'column',gap:15}}>
+          <Slider label="Age" val={p.age} set={p.setAge} min={18} max={75} unit="yrs"/>
+          <div style={{height:1,background:'#F0EEE7'}}/>
+          <Slider label="Weight" val={p.weight} set={p.setWeight} min={40} max={160} unit="kg"/>
+          <div style={{height:1,background:'#F0EEE7'}}/>
+          <Slider label="Height" val={p.height} set={p.setHeight} min={140} max={210} unit="cm"/>
+        </div>
+      </div>
+      <div style={{display:'flex',justifyContent:'center',marginTop:24}}>
+        <div style={{display:'inline-flex',alignItems:'center',gap:14,border:'2px solid '+b.color,background:'#fff',borderRadius:16,padding:'12px 20px'}}>
+          <div><div style={{fontSize:11,color:'#9A958A',fontWeight:600,letterSpacing:'.04em'}}>BMI</div><div className="hd" style={{fontSize:26,fontWeight:700,lineHeight:1,marginTop:1}}>{b.bmi}</div></div>
+          <div style={{width:1,height:34,background:'#EDEAE2'}}/>
+          <span style={{fontSize:14,fontWeight:700,color:b.color}}>{b.label}</span>
+        </div>
+      </div>
+      {b.eligible
+        ? <div style={{background:'#EAF1E7',border:'1px solid #D6E2D2',borderRadius:18,padding:'16px 18px',marginTop:16,display:'flex',gap:11,alignItems:'center',animation:'okRise .35s ease both'}}><div style={{width:34,height:34,borderRadius:'50%',background:'#5C7A5C',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="check" s={20} c="#fff"/></div><div><div style={{fontSize:14.5,fontWeight:600,color:'#46603F'}}>You're eligible</div><div style={{fontSize:12.5,color:'#5A6B57',marginTop:1}}>OneKilo's program is a strong fit. Let's continue.</div></div></div>
+        : <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:18,padding:'16px 18px',marginTop:16,display:'flex',gap:11,alignItems:'flex-start'}}><Ic n="info" s={22} c="#9A958A"/><div style={{fontSize:13,color:'#57534A',lineHeight:1.5}}>OneKilo is designed for a BMI of 25+. You can still continue — our doctor will advise the best path for you.</div></div>}
+    </div>
+  );
+}
+
+function QuestionStep({Q,ans,choose,toggleMedical}){
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <div style={kicker}>{Q.kicker}</div>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,lineHeight:1.08,margin:'0 0 18px'}}>{Q.heading}</h1>
+      <div style={{fontSize:16,fontWeight:600,lineHeight:1.35,marginBottom:6}}>{Q.title}</div>
+      {Q.subtitle && <p style={{fontSize:13.5,color:'#9A958A',margin:'0 0 20px',lineHeight:1.45}}>{Q.subtitle}</p>}
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {Q.opts.map(([key,label,sub])=>{
+          const on = Q.multi ? ans.medical.includes(key) : ans[Q.field]===key;
+          const icon = Q.multi ? (on?'check_box':'check_box_outline_blank') : (on?'check_circle':'radio_button_unchecked');
+          return <div key={key} onClick={()=>Q.multi?toggleMedical(key):choose(Q.field,key)} style={optRow(on)}>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:14.5,fontWeight:600}}>{label}</div>{sub&&<div style={{fontSize:12.5,color:'#9A958A',marginTop:3,lineHeight:1.4}}>{sub}</div>}</div>
+            <Ic n={icon} s={23} c={on?'#5C7A5C':'#C9C4B8'}/>
+          </div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PinStep({pincode,onPin,pinChecked}){
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <div style={kicker}>Almost there</div>
+      <h1 className="hd" style={{fontSize:32,fontWeight:700,lineHeight:1.06,margin:'0 0 10px'}}>Are we in<br/>your area?</h1>
+      <p style={{fontSize:15,color:'#9A958A',margin:'0 0 24px',lineHeight:1.5}}>OneKilo delivers care to your door. Enter your pincode to check availability.</p>
+      <label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:8}}>Pincode</label>
+      <input value={pincode} onChange={e=>onPin(e.target.value)} inputMode="numeric" placeholder="e.g. 682017" style={{width:'100%',border:'1px solid #EDEAE2',background:'#fff',borderRadius:16,padding:16,fontSize:20,fontWeight:600,letterSpacing:'.14em',fontFamily:'Poppins,sans-serif'}}/>
+      {pinChecked && <div style={{background:'#EAF1E7',border:'1px solid #D6E2D2',borderRadius:20,padding:20,marginTop:20,display:'flex',gap:13,alignItems:'center',animation:'okRise .35s ease both'}}><div style={{width:44,height:44,borderRadius:'50%',background:'#5C7A5C',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="check" s={26} c="#fff"/></div><div><div style={{fontSize:16,fontWeight:600,color:'#46603F'}}>Good news — we're in Kochi!</div><div style={{fontSize:13,color:'#5A6B57',marginTop:2}}>Home consults, labs, and delivery are all available at {pincode}.</div></div></div>}
+    </div>
+  );
+}
+
+function ConsultStep({consultDate,setConsultDate,consultSlot,setConsultSlot}){
+  const dates=[['Tue','22'],['Wed','23'],['Thu','24'],['Fri','25'],['Sat','26'],['Sun','27']];
+  const slots=['9:00 AM','10:30 AM','11:15 AM','1:00 PM','2:30 PM','4:00 PM'];
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <div style={kicker}>Get started</div>
+      <h1 className="hd" style={{fontSize:32,fontWeight:700,lineHeight:1.06,margin:'0 0 22px'}}>Book your<br/>first consult</h1>
+      <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:24,padding:20,display:'flex',alignItems:'center',gap:14,marginBottom:16}}><div style={{width:46,height:46,borderRadius:14,background:'#EAF1E7',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="stethoscope" s={24} c="#5C7A5C"/></div><div><div style={{fontSize:15,fontWeight:600}}>PMR / Family Physician</div><div style={{fontSize:13,color:'#9A958A',marginTop:2,lineHeight:1.4}}>Any licensed OneKilo physician may be assigned.</div></div></div>
+      <label style={{fontSize:14,fontWeight:600,color:'#57534A',display:'block',marginBottom:10}}>Choose a date</label>
+      <div className="hx" style={{display:'flex',gap:9,paddingBottom:6,marginBottom:20}}>{dates.map(([dow,day])=>{const on=consultDate===day;return <div key={day} onClick={()=>setConsultDate(day)} style={dateSt(on)}><div style={{fontSize:11,...(on?{opacity:.85}:{color:'#9A958A'})}}>{dow}</div><div style={{fontSize:17,fontWeight:700,marginTop:3}}>{day}</div></div>;})}</div>
+      <label style={{fontSize:14,fontWeight:600,color:'#57534A',display:'block',marginBottom:10}}>Choose a time</label>
+      <div style={{display:'flex',flexWrap:'wrap',gap:9}}>{slots.map(v=><span key={v} onClick={()=>setConsultSlot(v)} style={slotSt(consultSlot===v)}>{v}</span>)}</div>
+      <div style={{fontSize:12.5,color:'#9A958A',marginTop:12,display:'flex',alignItems:'center',gap:6}}><Ic n="schedule" s={16} c="#9A958A"/>All times shown in IST</div>
+    </div>
+  );
+}
+
+function OtpSheet({otp,onOtp,verify,close}){
+  const ready=otp.length>=4;
+  return (
+    <div style={{position:'absolute',inset:0,zIndex:40}}>
+      <div onClick={close} style={{position:'absolute',inset:0,background:'rgba(26,26,23,.45)',animation:'okFade .2s ease both'}}/>
+      <div style={{position:'absolute',left:0,right:0,bottom:0,background:'#F6F5F1',borderRadius:'28px 28px 0 0',padding:'12px 24px calc(26px + env(safe-area-inset-bottom))',animation:'okSheet .32s cubic-bezier(.4,0,.2,1) both'}}>
+        <div style={{width:42,height:5,borderRadius:99,background:'#DBD6CC',margin:'0 auto 22px'}}/>
+        <h2 className="hd" style={{fontSize:24,fontWeight:700,margin:'0 0 8px'}}>Verify your number</h2>
+        <p style={{fontSize:14.5,color:'#9A958A',margin:'0 0 24px',lineHeight:1.5}}>Enter the 4-digit code sent to <span style={{color:'#1A1A17',fontWeight:600}}>+91 98765 43210</span></p>
+        <div style={{position:'relative',marginBottom:20}}>
+          <div style={{display:'flex',gap:12,justifyContent:'center'}}>{[0,1,2,3].map(i=>{const f=i<otp.length,c=i===otp.length;return <div key={i} style={{width:58,height:66,borderRadius:16,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Poppins,sans-serif',fontSize:26,fontWeight:700,background:'#fff',border:'2px solid '+(f||c?'#1A1A17':'#EDEAE2')}}>{otp[i]||''}</div>;})}</div>
+          <input value={otp} onChange={e=>onOtp(e.target.value)} inputMode="numeric" maxLength={4} autoFocus style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:0,border:'none',background:'transparent'}}/>
+        </div>
+        <div style={{textAlign:'center',fontSize:13.5,color:'#9A958A',marginBottom:24}}>Didn't get it? <span style={{color:'#4E7B4E',fontWeight:600}}>Resend code</span></div>
+        <button onClick={verify} style={{width:'100%',border:'none',borderRadius:99,padding:17,fontSize:16,fontWeight:600,transition:'all .18s',background:ready?'#1A1A17':'#DBD6CC',color:'#fff'}}>Verify &amp; create account</button>
+        <div style={{textAlign:'center',fontSize:12,color:'#C9C4B8',marginTop:12}}>Demo: enter any 4 digits</div>
+      </div>
+    </div>
+  );
+}
+
+// ================= SUCCESS / PAYMENT =================
+function Success({onNext}){
+  return (<>
+    <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center',padding:'40px 32px'}}>
+      <div style={{width:96,height:96,borderRadius:'50%',background:'#5C7A5C',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:28,animation:'okPop .4s cubic-bezier(.2,.8,.3,1.2) both',boxShadow:'0 12px 34px rgba(92,122,92,.4)'}}><Ic n="check" s={52} c="#fff"/></div>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:'0 0 10px',animation:'okRise .4s .1s ease both'}}>You're all set, Rahul</h1>
+      <p style={{fontSize:15.5,color:'#9A958A',margin:0,lineHeight:1.55,maxWidth:300,animation:'okRise .4s .18s ease both'}}>Your OneKilo account is ready and your consult is being scheduled. One last step — confirm your consult fee.</p>
+    </div>
+    <div style={{flexShrink:0,padding:'14px 22px calc(24px + env(safe-area-inset-bottom))'}}><button onClick={onNext} style={pillBtn}>Continue to payment</button></div>
+  </>);
+}
+function Payment({onBack,onPay}){
+  return (<>
+    <div style={{display:'flex',alignItems:'center',gap:14,padding:'18px 20px 6px',flexShrink:0}}><button onClick={onBack} style={{width:38,height:38,borderRadius:'50%',border:'none',background:'#EDEBE4',display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="arrow_back" s={22} c="#1A1A17"/></button></div>
+    <div className="scr" style={{flex:1,padding:'14px 22px 30px'}}>
+      <div style={{fontSize:15,color:'#9A958A',fontWeight:500,marginBottom:6}}>Confirm &amp; pay</div>
+      <h1 className="hd" style={{fontSize:34,fontWeight:700,lineHeight:1.05,margin:'0 0 24px'}}>Your first<br/>consult</h1>
+      <div style={{...card,marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,paddingBottom:18,borderBottom:'1px solid #F0EEE7'}}><div style={{width:46,height:46,borderRadius:14,background:'#EAF1E7',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="stethoscope" s={24} c="#5C7A5C"/></div><div><div style={{fontSize:15,fontWeight:600}}>Initial Consult</div><div style={{fontSize:13,color:'#9A958A',marginTop:2}}>Wed, 23 Jul 2026 · 2:30 PM IST</div></div></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:14,color:'#57534A',marginTop:16}}><span>Consult fee</span><span style={{fontWeight:600,color:'#1A1A17'}}>Rs. 500</span></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}><span className="hd" style={{fontSize:16,fontWeight:600}}>Total</span><span className="hd" style={{fontSize:22,fontWeight:700}}>Rs. 500</span></div>
+      </div>
+      <div style={{display:'flex',justifyContent:'center',gap:16,flexWrap:'wrap',marginTop:8}}>{[['lock','Secure'],['verified','Licensed doctors'],['devices','100% online']].map(([i,t])=><span key={t} style={{fontSize:12,color:'#9A958A',display:'flex',alignItems:'center',gap:5}}><Ic n={i} s={15} c="#5C7A5C"/>{t}</span>)}</div>
+    </div>
+    <div style={{flexShrink:0,padding:'14px 22px calc(24px + env(safe-area-inset-bottom))',background:'linear-gradient(180deg,rgba(246,245,241,0),#F6F5F1 34%)'}}><button onClick={onPay} style={pillBtn}>Pay Rs. 500</button></div>
+  </>);
+}
+
+// ================= APP SHELL =================
+function AppShell(p){
+  const {route,go,drawer,setDrawer}=p;
+  return (<>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px 10px',flexShrink:0,zIndex:6}}>
+      <button onClick={()=>setDrawer(true)} aria-label="Menu" style={{width:42,height:42,borderRadius:14,border:'none',background:'#EDEBE4',display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="menu" s={24} c="#1A1A17"/></button>
+      <div className="hd" style={{fontSize:20,fontWeight:600}}><span style={{color:'#1A1A17'}}>One</span><span style={{color:'#5C7A5C',fontWeight:700}}>Kilo</span></div>
+      <button onClick={()=>go('profile')} aria-label="Profile" style={{width:42,height:42,borderRadius:'50%',border:'none',background:AVATAR,boxShadow:'0 2px 8px rgba(78,123,78,.35)'}}/>
+    </div>
+    <main className="scr" style={{flex:1,minHeight:0,padding:'8px 20px 30px'}}>
+      {route==='home' && <Home {...p} />}
+      {route==='labbook' && <LabBook {...p} />}
+      {route==='appointments' && <Appointments {...p} />}
+      {route==='lab' && <Lab />}
+      {route==='medication' && <Medication />}
+      {route==='progress' && <Progress />}
+      {route==='notifications' && <Notifications />}
+      {route==='profile' && <Profile {...p} />}
+    </main>
+    {drawer && <Drawer route={route} go={go} close={()=>setDrawer(false)} />}
+  </>);
+}
+
+function Drawer({route,go,close}){
+  return (
+    <div style={{position:'absolute',inset:0,zIndex:30}}>
+      <div onClick={close} style={{position:'absolute',inset:0,background:'rgba(26,26,23,.42)',animation:'okFade .2s ease both'}}/>
+      <div style={{position:'absolute',top:0,left:0,bottom:0,width:292,maxWidth:'84%',background:'#F6F5F1',boxShadow:'8px 0 40px rgba(0,0,0,.2)',display:'flex',flexDirection:'column',padding:'20px 16px calc(18px + env(safe-area-inset-bottom))',animation:'okSlide .3s cubic-bezier(.4,0,.2,1) both'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 6px 4px'}}><div className="hd" style={{fontSize:20,fontWeight:600}}><span style={{color:'#1A1A17'}}>One</span><span style={{color:'#5C7A5C',fontWeight:700}}>Kilo</span></div><button onClick={close} style={{width:36,height:36,border:'none',background:'#EDEBE4',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="close" s={20} c="#1A1A17"/></button></div>
+        <nav style={{display:'flex',flexDirection:'column',gap:4,marginTop:22,flex:1}}>{NAV.map(n=>{const on=n.key===route;return <div key={n.key} onClick={()=>go(n.key)} style={{display:'flex',alignItems:'center',gap:13,padding:'13px 14px',borderRadius:14,cursor:'pointer',transition:'background .18s',...(on?{background:'#EAF1E7',color:'#46603F'}:{color:'#57534A'})}}><Ic n={n.icon} s={23}/><span style={{fontSize:15,fontWeight:on?600:500}}>{n.label}</span></div>;})}</nav>
+        <div onClick={()=>go('profile')} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 12px',borderTop:'1px solid #E7E4DB',marginTop:8,cursor:'pointer',borderRadius:16}}><div style={{width:44,height:44,borderRadius:'50%',background:AVATAR,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:14,flexShrink:0}}>RN</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:600}}>Rahul Nair</div><div style={{fontSize:12.5,color:'#9A958A'}}>Month 1 of 3 · View profile</div></div><Ic n="chevron_right" s={20} c="#9A958A"/></div>
+      </div>
+    </div>
+  );
+}
+
+function Home(p){
+  const {stage,go,advance}=p;
+  const sd=STAGES[stage];
+  const programActive=stage>=2;
+  const jDefs=[
+    {label:'Consult',icon:'stethoscope',route:null,subs:['Confirmed · 23 Jul','Completed','Completed','Completed']},
+    {label:'Purchase program',icon:'redeem',route:null,subs:['Unlocks after consult','Ready to purchase','Purchased','Purchased']},
+    {label:'Lab test',icon:'science',route:'lab',subs:['Locked','Locked','Ready to book','Completed']},
+    {label:'Pharmacy',icon:'medication',route:'medication',subs:['Locked','Locked','Locked','Dispatched']},
+    {label:'Reviews',icon:'event_repeat',route:'appointments',subs:['Locked','Locked','Locked','In progress']},
+  ];
+  const statDay='Day '+[3,8,15,24][stage];
+  const wt=tog(p.waNotif);
+  const feats=[['Specialist consult','Diabetologist or Endocrinologist'],['Home lab test','No clinic visit needed'],['Monthly medication','Delivered to your door'],['Dose reviews','Adjusted by your doctor']];
+  const ctaAction = stage===2 ? ()=>go('labbook') : stage===3 ? ()=>go('appointments') : advance;
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <div style={{fontSize:16,color:'#9A958A',fontWeight:500,marginBottom:4}}>Welcome back,</div>
+      <h1 className="hd" style={{fontSize:32,fontWeight:700,lineHeight:1.05,margin:'0 0 6px'}}>Rahul Nair</h1>
+      {programActive && <div style={{background:'#EAF1E7',border:'1px solid #D6E2D2',borderRadius:14,padding:'10px 14px',display:'flex',alignItems:'center',gap:8,marginTop:14}}><Ic n="verified" s={19} c="#5C7A5C"/><span style={{fontSize:13.5,fontWeight:600,color:'#46603F'}}>3-month program active</span><span style={{fontSize:12.5,color:'#5A6B57'}}>· Month 1 of 3</span></div>}
+      <div style={{display:'flex',gap:10,margin:'18px 0 6px'}}>
+        <div style={{flex:1,background:'#fff',border:'1px solid #EDEAE2',borderRadius:18,padding:'15px 13px'}}><div className="hd" style={{fontSize:23,fontWeight:700}}>{statDay}</div><div style={{fontSize:11.5,color:'#9A958A',marginTop:2}}>of your 90</div></div>
+        <div style={{flex:1,background:'#5C7A5C',borderRadius:18,padding:'15px 13px',color:'#fff'}}><div className="hd" style={{fontSize:23,fontWeight:700}}>−2.6<span style={{fontSize:12,fontWeight:600}}> kg</span></div><div style={{fontSize:11.5,opacity:.85,marginTop:2}}>since start</div></div>
+        <div style={{flex:1,background:'#fff',border:'1px solid #EDEAE2',borderRadius:18,padding:'15px 13px'}}><div className="hd" style={{fontSize:23,fontWeight:700}}>1<span style={{fontSize:13,color:'#9A958A'}}>/3</span></div><div style={{fontSize:11.5,color:'#9A958A',marginTop:2}}>month</div></div>
+      </div>
+      <div style={{fontSize:12.5,color:'#9A958A',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',margin:'22px 0 10px'}}>{sd.kicker}</div>
+
+      {stage!==1 ? <>
+        <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:26,padding:24,animation:'okRise .3s ease both'}}>
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}><h3 className="hd" style={{fontSize:20,fontWeight:600,margin:0,lineHeight:1.2}}>{sd.cardTitle}</h3><Ic n="north_east" s={22} c="#9A958A"/></div>
+          <p style={{fontSize:15,color:'#57534A',margin:'12px 0 0',lineHeight:1.5}}>{sd.cardBody}</p>
+          {sd.hasMeta && <div style={{display:'flex',alignItems:'center',gap:12,marginTop:20,paddingTop:20,borderTop:'1px solid #F0EEE7'}}><div style={{width:44,height:44,borderRadius:'50%',background:AVATAR,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,flexShrink:0,fontSize:14}}>MN</div><div style={{flex:1}}><div style={{fontSize:14.5,fontWeight:600}}>Dr. Meera Nair</div><div style={{fontSize:13,color:'#9A958A'}}>Family Physician</div></div><div style={{textAlign:'right'}}><div style={{fontSize:14,fontWeight:600}}>Wed, 23 Jul</div><div style={{fontSize:13,color:'#9A958A'}}>2:30 PM</div></div></div>}
+        </div>
+        <button onClick={ctaAction} style={{...pillBtn,padding:17,fontSize:15.5,marginTop:16}}>{sd.cta}</button>
+        {stage===0 && <>
+          <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:14}}><div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}><Ic n="videocam" s={20} c="#5C7A5C"/><span style={{fontSize:13.5,color:'#57534A',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>meet.google.com/onk-defg-hij</span></div><button onClick={p.copyMeet} style={{background:'#EAF1E7',color:'#46603F',border:'none',borderRadius:12,padding:'9px 13px',fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6,flexShrink:0}}><Ic n={p.copied?'check':'content_copy'} s={16}/>{p.copied?'Copied':'Copy'}</button></div>
+          <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:'15px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:12}}><div style={{display:'flex',alignItems:'center',gap:10}}><Ic n="chat" s={20} c="#5C7A5C"/><span style={{fontSize:14,fontWeight:600}}>Receive WhatsApp notification</span></div><div onClick={()=>p.setWaNotif(v=>!v)} style={wt.track}><div style={wt.knob}/></div></div>
+        </>}
+      </> : <>
+        <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:26,padding:24,animation:'okRise .3s ease both'}}>
+          <h3 className="hd" style={{fontSize:21,fontWeight:700,margin:'0 0 6px',lineHeight:1.15}}>Your 3-month OneKilo program</h3>
+          <p style={{fontSize:14,color:'#57534A',margin:'0 0 18px',lineHeight:1.5}}>Everything you need to reach your goal — all from home.</p>
+          <div style={{display:'flex',flexDirection:'column',gap:13,marginBottom:20}}>{feats.map(([t,s])=><div key={t} style={{display:'flex',alignItems:'flex-start',gap:11}}><Ic n="check_circle" s={20} c="#5C7A5C"/><div><div style={{fontSize:14,fontWeight:600}}>{t}</div><div style={{fontSize:12.5,color:'#9A958A',marginTop:1}}>{s}</div></div></div>)}</div>
+          <div style={{background:'#F6F5F1',borderRadius:16,padding:'16px 18px',display:'flex',alignItems:'center',justifyContent:'space-between'}}><div><div style={{fontSize:12,color:'#9A958A'}}>3-month program</div><div style={{fontSize:11.5,color:'#9A958A',marginTop:1}}>No hidden fees · billed once</div></div><div className="hd" style={{fontSize:26,fontWeight:700}}>Rs. 12,000</div></div>
+        </div>
+        <button onClick={advance} style={{...pillBtn,padding:17,fontSize:15.5,marginTop:16}}>Purchase program · Rs. 12,000</button>
+      </>}
+
+      <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:26,padding:22,marginTop:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}><div className="hd" style={{fontSize:17,fontWeight:600}}>Your journey</div><span style={{fontSize:12.5,color:'#9A958A',fontWeight:500}}>{Math.min(stage+1,5)} of 5</span></div>
+        <div style={{display:'flex',flexDirection:'column'}}>{jDefs.map((d,i)=>{
+          const st = i<stage?'done':i===stage?'active':'locked';
+          const v=vstep(st); const locked=st==='locked';
+          const badgeText=st==='done'?'Done':st==='active'?'Now':'Locked';
+          const badge = st==='done'?{background:'#EAF1E7',color:'#46603F'}:st==='active'?{background:'#1A1A17',color:'#fff'}:{background:'#EDEBE4',color:'#9A958A'};
+          return <div key={d.label} onClick={()=>{if(!locked&&d.route)go(d.route);}} style={{display:'flex',alignItems:'center',gap:14,padding:'12px 0',borderBottom:i<jDefs.length-1?'1px solid #F4F2EC':'none',cursor:(locked||!d.route)?'default':'pointer'}}>
+            <div style={v.dot}><Ic n={st==='done'?'check':locked?'lock':d.icon} s={20}/></div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:14.5,fontWeight:600,color:v.titleColor}}>{d.label}</div><div style={{fontSize:12.5,color:'#9A958A',marginTop:1}}>{d.subs[stage]}</div></div>
+            <span style={{fontSize:11,fontWeight:600,padding:'4px 10px',borderRadius:99,...badge}}>{badgeText}</span>
+          </div>;
+        })}</div>
+      </div>
+    </div>
+  );
+}
+
+function LabBook(p){
+  const dates=[['Thu','24'],['Fri','25'],['Sat','26'],['Sun','27']];
+  const slots=['Morning · 7–9 AM','Morning · 9–11 AM','Afternoon · 12–2 PM'];
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}><button onClick={()=>p.go('home')} style={{width:38,height:38,borderRadius:'50%',border:'none',background:'#EDEBE4',display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="arrow_back" s={22} c="#1A1A17"/></button><h1 className="hd" style={{fontSize:24,fontWeight:700,margin:0}}>Book home lab</h1></div>
+      <div style={{background:'#EAF1E7',border:'1px solid #D6E2D2',borderRadius:16,padding:'12px 16px',display:'flex',alignItems:'center',gap:8,marginBottom:18}}><Ic n="check_circle" s={18} c="#5C7A5C"/><span style={{fontSize:13,fontWeight:600,color:'#46603F'}}>Included in your program — no extra charge</span></div>
+      <label style={{fontSize:14,fontWeight:600,color:'#57534A',display:'block',marginBottom:9}}>Collection address</label>
+      <input defaultValue={ADDRESS} style={{width:'100%',border:'1px solid #EDEAE2',background:'#fff',borderRadius:16,padding:'15px 16px',fontSize:14,marginBottom:20}}/>
+      <label style={{fontSize:14,fontWeight:600,color:'#57534A',display:'block',marginBottom:10}}>Choose a date</label>
+      <div className="hx" style={{display:'flex',gap:9,paddingBottom:6,marginBottom:20}}>{dates.map(([dow,day])=>{const on=p.labDate===day;return <div key={day} onClick={()=>p.setLabDate(day)} style={dateSt(on)}><div style={{fontSize:11,...(on?{opacity:.85}:{color:'#9A958A'})}}>{dow}</div><div style={{fontSize:17,fontWeight:700,marginTop:3}}>{day}</div></div>;})}</div>
+      <label style={{fontSize:14,fontWeight:600,color:'#57534A',display:'block',marginBottom:10}}>Choose a slot</label>
+      <div style={{display:'flex',flexWrap:'wrap',gap:9}}>{slots.map(v=><span key={v} onClick={()=>p.setLabSlot(v)} style={slotSt(p.labSlot===v)}>{v}</span>)}</div>
+      <button onClick={p.confirmLab} style={{...pillBtn,padding:17,fontSize:15.5,marginTop:24}}>Confirm lab booking</button>
+      <p style={{fontSize:13,color:'#9A958A',fontStyle:'italic',margin:'14px 0 0',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}><Ic n="chat" s={16} c="#9A958A"/>We'll notify you on WhatsApp.</p>
+    </div>
+  );
+}
+
+function ApptCard({initials,name,role,type,when,link,past}){
+  return (
+    <div style={{...card,display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><div style={{display:'flex',alignItems:'center',gap:12}}><div style={{width:46,height:46,borderRadius:'50%',background:past?'#C4BFB4':AVATAR,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>{initials}</div><div><div style={{fontSize:15,fontWeight:600}}>{name}</div><span style={{fontSize:11.5,background:past?'#EDEBE4':'#EAF1E7',color:past?'#9A958A':'#46603F',borderRadius:99,padding:'3px 9px',fontWeight:600}}>{role}</span></div></div>{past?<span style={{background:'#EDEBE4',color:'#9A958A',borderRadius:99,padding:'4px 11px',fontSize:11.5,fontWeight:600}}>Completed</span>:<Ic n="north_east" s={22} c="#9A958A"/>}</div>
+      <div className="hd" style={{fontSize:17,fontWeight:600}}>{type}</div>
+      <div style={{fontSize:13.5,color:'#9A958A',display:'inline-flex',alignItems:'center',gap:6}}><Ic n="calendar_month" s={16}/>{when}</div>
+      {past
+        ? <button style={{alignSelf:'flex-start',background:'#F6F5F1',border:'1px solid #EDEAE2',color:'#57534A',borderRadius:12,padding:'9px 15px',fontSize:13,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6}}><Ic n="description" s={16}/>View Notes</button>
+        : <><div style={{background:'#F6F5F1',borderRadius:14,padding:'11px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><div style={{display:'flex',alignItems:'center',gap:9,minWidth:0}}><Ic n="videocam" s={18} c="#5C7A5C"/><span style={{fontSize:12.5,color:'#57534A',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{link}</span></div><button style={{background:'#EAF1E7',color:'#46603F',border:'none',borderRadius:10,padding:'7px 11px',fontSize:12,fontWeight:600,flexShrink:0}}>Copy</button></div>
+          <div style={{display:'flex',gap:18}}><a href="#">Reschedule</a><a href="#" style={{color:'#C55A43'}}>Cancel</a></div></>}
+    </div>
+  );
+}
+function Appointments(p){
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:'0 0 18px'}}>Appointments</h1>
+      <div style={{display:'flex',gap:6,background:'#EDEBE4',borderRadius:99,padding:4,marginBottom:22}}><button onClick={()=>p.setApptTab('upcoming')} style={seg(p.apptTab==='upcoming')}>Upcoming</button><button onClick={()=>p.setApptTab('past')} style={seg(p.apptTab==='past')}>Past</button></div>
+      {p.apptTab==='upcoming'
+        ? <div style={{display:'flex',flexDirection:'column',gap:14,animation:'okFade .25s ease both'}}>
+            <ApptCard initials="RK" name="Dr. Rohan Kapoor" role="Diabetologist" type="Specialist Consult" when="Tue, 29 Jul 2026 · 12:00 PM IST" link="meet.google.com/onk-r2k-plm"/>
+            <ApptCard initials="MN" name="Dr. Meera Nair" role="Family Physician" type="2-Week Review" when="Wed, 13 Aug 2026 · 5:30 PM IST" link="meet.google.com/onk-2wk-rev"/>
+          </div>
+        : <div style={{animation:'okFade .25s ease both'}}><ApptCard past initials="MN" name="Dr. Meera Nair" role="Family Physician" type="Initial Consult" when="Wed, 23 Jul 2026 · 2:30 PM IST"/></div>}
+    </div>
+  );
+}
+
+function VTracker({steps}){
+  return <div>{steps.map((s,i)=>{const v=vstep(s.st);return <div key={i} style={{display:'flex',gap:14,alignItems:'flex-start'}}>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',alignSelf:'stretch'}}><div style={v.dot}><Ic n={s.st==='done'?'check':s.icon} s={16}/></div>{i<steps.length-1 && <div style={{width:2,flex:1,minHeight:18,background:v.lineColor}}/>}</div>
+    <div style={{paddingBottom:16}}><div style={{fontSize:14,fontWeight:600,color:v.titleColor}}>{s.label}</div><div style={{fontSize:12.5,color:'#9A958A',marginTop:2}}>{s.sub}</div></div>
+  </div>;})}</div>;
+}
+function Report({name}){
+  return <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:18,display:'flex',alignItems:'center',gap:14}}><div style={{width:42,height:52,borderRadius:9,background:'#F0E7E3',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="picture_as_pdf" s={22} c="#C55A43"/></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:14.5,fontWeight:600}}>{name}</div><div style={{fontSize:12.5,color:'#9A958A',marginTop:2}}>26 Jul 2026</div></div><Ic n="download" s={24} c="#5C7A5C"/></div>;
+}
+function Lab(){
+  return (
+    <div style={{animation:'okFade .3s ease both',display:'flex',flexDirection:'column',gap:16}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:0}}>Lab &amp; Reports</h1>
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}><div className="hd" style={{fontSize:17,fontWeight:600}}>Home collection</div><span style={{background:'#EAF1E7',color:'#46603F',borderRadius:99,padding:'5px 11px',fontSize:11.5,fontWeight:600}}>Confirmed</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:12}}><Ic n="location_on" s={20} c="#5C7A5C"/><div><div style={{fontSize:12,color:'#9A958A'}}>Address</div><div style={{fontSize:14,fontWeight:500,marginTop:2,lineHeight:1.4}}>{ADDRESS}</div></div></div>
+          <div style={{display:'flex',alignItems:'flex-start',gap:12}}><Ic n="event" s={20} c="#5C7A5C"/><div><div style={{fontSize:12,color:'#9A958A'}}>Date &amp; slot</div><div style={{fontSize:14,fontWeight:500,marginTop:2}}>Fri, 25 Jul 2026 · 9–11 AM</div></div></div>
+          <div style={{display:'flex',alignItems:'center',gap:12,paddingTop:14,borderTop:'1px solid #F0EEE7'}}><div style={{width:40,height:40,borderRadius:'50%',background:'radial-gradient(circle at 32% 28%,#B7C9A9,#7E9A6C 78%)',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:13,flexShrink:0}}>SM</div><div style={{flex:1}}><div style={{fontSize:14,fontWeight:600}}>Sooraj M. · Sample collector</div><div style={{fontSize:12.5,color:'#9A958A'}}>Assigned · arriving in the slot window</div></div><div style={{width:36,height:36,borderRadius:'50%',background:'#EAF1E7',display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="call" s={19} c="#5C7A5C"/></div></div>
+        </div>
+      </div>
+      <div style={card}><div style={{fontSize:14,color:'#9A958A',fontWeight:500,marginBottom:18}}>Collection status</div><VTracker steps={[{st:'done',label:'Lab booked',sub:'Fri, 25 Jul · 9–11 AM slot'},{st:'done',label:'Sample collected',sub:'Sooraj M. collected at 9:40 AM'},{st:'done',label:'Test done',sub:'Results uploaded 26 Jul'}]}/></div>
+      <p style={{fontSize:13,color:'#9A958A',fontStyle:'italic',margin:0,display:'flex',alignItems:'center',gap:6}}><Ic n="chat" s={16} c="#9A958A"/>We'll notify you on WhatsApp at each step.</p>
+      <div style={{fontSize:14,color:'#9A958A',fontWeight:500,marginTop:4}}>Your reports</div>
+      <div style={{display:'flex',flexDirection:'column',gap:12}}><Report name="Full Metabolic Panel"/><Report name="HbA1c &amp; Lipid Profile"/></div>
+    </div>
+  );
+}
+
+function Medication(){
+  return (
+    <div style={{animation:'okFade .3s ease both',display:'flex',flexDirection:'column',gap:16}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:0}}>Medication</h1>
+      <div style={card}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}><div style={{display:'flex',alignItems:'center',gap:14}}><div style={{width:50,height:50,borderRadius:15,background:'#EAF1E7',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n="medication" s={27} c="#5C7A5C"/></div><div><div className="hd" style={{fontSize:18,fontWeight:600}}>Semaglutide</div><div style={{fontSize:13.5,color:'#9A958A',marginTop:2}}>0.25 mg · once weekly</div></div></div><span style={{background:'#EAF1E7',color:'#46603F',borderRadius:99,padding:'5px 11px',fontSize:11.5,fontWeight:600,whiteSpace:'nowrap'}}>Month 1/3</span></div><div style={{display:'flex',gap:28,borderTop:'1px solid #F0EEE7',paddingTop:16}}><div><div style={{fontSize:12,color:'#9A958A'}}>Start date</div><div style={{fontSize:14,fontWeight:600,marginTop:3}}>29 Jul 2026</div></div><div><div style={{fontSize:12,color:'#9A958A'}}>Prescribed by</div><div style={{fontSize:14,fontWeight:600,marginTop:3}}>Dr. R. Kapoor</div></div></div></div>
+      <div style={card}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}><div className="hd" style={{fontSize:17,fontWeight:600}}>Pharmacy &amp; delivery</div><span style={{background:'#FBF0DF',color:'#B57A28',borderRadius:99,padding:'5px 11px',fontSize:11.5,fontWeight:600}}>Dispatched</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:20}}>{[['Pharmacy','OneKilo Care Pharmacy'],['Order ID','#OK-24817'],['Courier','BlueDart · AWB 7729104']].map(([k,v])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:13.5}}><span style={{color:'#9A958A'}}>{k}</span><span style={{fontWeight:600}}>{v}</span></div>)}</div>
+        <div style={{borderTop:'1px solid #F0EEE7',paddingTop:18}}><VTracker steps={[{st:'done',label:'Order placed',sub:'Prescription received · 27 Jul'},{st:'done',label:'Packed at pharmacy',sub:'OneKilo Care Pharmacy · 28 Jul'},{st:'active',icon:'local_shipping',label:'Dispatched',sub:'Handed to BlueDart · 29 Jul'},{st:'locked',icon:'directions_bike',label:'Out for delivery',sub:'Expected 30 Jul'},{st:'locked',icon:'home',label:'Delivered',sub:'Awaiting delivery'}]}/></div>
+        <div style={{background:'#FBF0DF',borderRadius:12,padding:'10px 14px',fontSize:13,color:'#B57A28',fontWeight:500,display:'inline-flex',alignItems:'center',gap:6,marginTop:6}}><Ic n="schedule" s={16} c="#B57A28"/>Estimated delivery: 30 Jul 2026</div>
+      </div>
+      <div style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:14}}><div style={{display:'flex',alignItems:'flex-start',gap:11}}><Ic n="location_on" s={22} c="#5C7A5C"/><div><div style={{fontSize:14,fontWeight:600}}>Delivery address</div><div style={{fontSize:13,color:'#9A958A',marginTop:3,lineHeight:1.4}}>{ADDRESS}</div></div></div><a href="#" style={{flexShrink:0}}>Edit</a></div>
+      <div style={card}><div style={{fontSize:14,color:'#9A958A',fontWeight:500,marginBottom:14}}>Medication history</div>
+        <div style={{border:'1px solid #D6E2D2',background:'#EAF1E7',borderRadius:16,padding:16,marginBottom:10}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><span style={{fontSize:14,fontWeight:600,color:'#46603F'}}>Month 1 · Current dose</span><Ic n="expand_less" s={20} c="#5C7A5C"/></div><div style={{fontSize:13,color:'#57534A',marginTop:8,lineHeight:1.4}}>Semaglutide 0.25 mg weekly · started 29 Jul 2026 · Dr. R. Kapoor.</div></div>
+        {['Month 2','Month 3'].map((m,i)=><div key={m} style={{border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:16,padding:16,marginBottom:i===0?10:0,display:'flex',alignItems:'center',justifyContent:'space-between'}}><div style={{display:'flex',alignItems:'center',gap:10}}><Ic n="lock" s={20} c="#C9C4B8"/><span style={{fontSize:14,fontWeight:600,color:'#9A958A'}}>{m}</span></div><span style={{fontSize:12,color:'#C9C4B8'}}>After {m} review</span></div>)}
+      </div>
+    </div>
+  );
+}
+
+function Progress(){
+  const bars=[100,96,90,88,82,78,74,70];
+  return (
+    <div style={{animation:'okFade .3s ease both',display:'flex',flexDirection:'column',gap:16}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:0}}>Progress</h1>
+      <div style={{display:'flex',gap:12}}>
+        <div style={{flex:1,background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:18}}><div style={{fontSize:12,color:'#9A958A'}}>Start</div><div className="hd" style={{fontSize:22,fontWeight:700,marginTop:4}}>85 kg</div></div>
+        <div style={{flex:1,background:'#5C7A5C',borderRadius:20,padding:18,color:'#fff'}}><div style={{fontSize:12,opacity:.85}}>Now</div><div className="hd" style={{fontSize:22,fontWeight:700,marginTop:4}}>82.4 kg</div><div style={{fontSize:12,fontWeight:600,marginTop:2}}>▼ 2.6 kg</div></div>
+        <div style={{flex:1,background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:18}}><div style={{fontSize:12,color:'#9A958A'}}>Goal</div><div className="hd" style={{fontSize:22,fontWeight:700,marginTop:4}}>72 kg</div></div>
+      </div>
+      <div style={card}><div className="hd" style={{fontSize:16,fontWeight:600}}>Weight trend</div><div style={{fontSize:12.5,color:'#9A958A',margin:'4px 0 18px'}}>2.6 of 13 kg toward goal</div><div style={{height:8,background:'#EDEBE4',borderRadius:99,overflow:'hidden'}}><div style={{width:'20%',height:'100%',background:'#5C7A5C',borderRadius:99}}/></div><div style={{height:130,marginTop:22,display:'flex',alignItems:'flex-end',gap:9}}>{bars.map((h,i)=><div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6}}><div style={{width:'100%',borderRadius:'6px 6px 0 0',background:'#D6E2D2',height:h+'%'}}/><span style={{fontSize:10,color:'#C9C4B8'}}>W{i+1}</span></div>)}</div></div>
+    </div>
+  );
+}
+
+function Notifications(){
+  const feed=[['check_circle','Consult confirmed','Your consult with Dr. Meera Nair is booked for 23 Jul, 2:30 PM.','2h'],['science','Lab results uploaded','Your Full Metabolic Panel report is ready to download.','1d'],['local_shipping','Medication dispatched','Your Month 1 medication is on the way — est. 30 Jul.','1d'],['event','Review reminder','Your 2-Week Review is scheduled for 13 Aug, 5:30 PM.','3d']];
+  return (
+    <div style={{animation:'okFade .3s ease both',display:'flex',flexDirection:'column',gap:12}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:'0 0 6px'}}>Notifications</h1>
+      {feed.map(([i,t,b,tm])=><div key={t} style={{background:'#fff',border:'1px solid #EDEAE2',borderRadius:20,padding:18,display:'flex',alignItems:'flex-start',gap:14}}><div style={{width:40,height:40,borderRadius:12,background:'#EAF1E7',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ic n={i} s={21} c="#5C7A5C"/></div><div style={{flex:1}}><div style={{fontSize:14.5,fontWeight:600}}>{t}</div><div style={{fontSize:13,color:'#9A958A',marginTop:3,lineHeight:1.4}}>{b}</div></div><span style={{fontSize:12,color:'#C9C4B8',whiteSpace:'nowrap'}}>{tm}</span></div>)}
+    </div>
+  );
+}
+
+function Profile(p){
+  const tabs=[['personal','Personal'],['medical','Medical'],['addresses','Addresses'],['notifications','Notifications'],['payment','Payments'],['security','Security']];
+  const nrDefs=[['Appointment reminders','appt_wa','appt_app'],['Lab updates','lab_wa','lab_app'],['Delivery status','del_wa','del_app'],['Monthly review reminders','rev_wa','rev_app']];
+  const otherMap={medical:['clinical_notes','Medical Details'],addresses:['location_on','Saved Addresses'],payment:['receipt_long','Payment History'],security:['lock','Security']};
+  const t=p.profileTab;
+  return (
+    <div style={{animation:'okFade .3s ease both'}}>
+      <h1 className="hd" style={{fontSize:30,fontWeight:700,margin:'0 0 18px'}}>Profile</h1>
+      <div className="hx" style={{display:'flex',gap:8,paddingBottom:4,marginBottom:20}}>{tabs.map(([k,label])=>{const on=t===k;return <div key={k} onClick={()=>p.setProfileTab(k)} style={{flexShrink:0,borderRadius:99,padding:'9px 16px',fontSize:13,transition:'all .18s',...(on?{background:'#1A1A17',color:'#fff',fontWeight:600}:{background:'#fff',color:'#57534A',border:'1px solid #EDEAE2',fontWeight:500})}}>{label}</div>;})}</div>
+      {t==='personal' && <div style={{animation:'okFade .25s ease both',display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{...card,display:'flex',flexDirection:'column',gap:14}}>
+          <div><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Full name</label><input defaultValue="Rahul Nair" style={{width:'100%',border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:14,padding:'14px 15px',fontSize:15}}/></div>
+          <div><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Phone number</label><div style={{display:'flex',gap:10}}><input defaultValue="+91 98765 43210" style={{flex:1,minWidth:0,border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:14,padding:'14px 15px',fontSize:15}}/><button style={{background:'#EAF1E7',border:'none',color:'#46603F',borderRadius:14,padding:'0 18px',fontSize:13.5,fontWeight:600}}>Change</button></div></div>
+          <div><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Address</label><input defaultValue={ADDRESS} style={{width:'100%',border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:14,padding:'14px 15px',fontSize:14}}/></div>
+          <div style={{display:'flex',gap:12}}><div style={{flex:1}}><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Date of birth</label><input defaultValue="14 Mar 1992" style={{width:'100%',border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:14,padding:'14px 15px',fontSize:15}}/></div><div style={{width:110}}><label style={{fontSize:13,fontWeight:600,color:'#57534A',display:'block',marginBottom:7}}>Gender</label><input defaultValue="Male" style={{width:'100%',border:'1px solid #EDEAE2',background:'#F6F5F1',borderRadius:14,padding:'14px 15px',fontSize:15}}/></div></div>
+        </div>
+        <button style={{...pillBtn,padding:16,fontSize:15}}>Save changes</button>
+        <a href="#" style={{textAlign:'center',fontSize:13.5,fontWeight:600,color:'#C55A43',padding:4}}>Deactivate account</a>
+      </div>}
+      {t==='notifications' && <div style={{animation:'okFade .25s ease both',...card}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:'14px 18px',alignItems:'center'}}>
+          <div/><div style={{fontSize:11.5,fontWeight:600,color:'#9A958A',textAlign:'center'}}>WhatsApp</div><div style={{fontSize:11.5,fontWeight:600,color:'#9A958A',textAlign:'center'}}>In-App</div>
+          {nrDefs.map(([label,wa,app])=>{const wt=tog(p.notif[wa]),at=tog(p.notif[app]);const T=(k,st)=><div style={{display:'flex',justifyContent:'center',borderTop:'1px solid #F0EEE7',paddingTop:14}}><div onClick={()=>p.setNotif(n=>({...n,[k]:!n[k]}))} style={st.track}><div style={st.knob}/></div></div>;return <React.Fragment key={label}><div style={{fontSize:14,fontWeight:500,borderTop:'1px solid #F0EEE7',paddingTop:14}}>{label}</div>{T(wa,wt)}{T(app,at)}</React.Fragment>;})}
+        </div>
+      </div>}
+      {!['personal','notifications'].includes(t) && <div style={{animation:'okFade .25s ease both',...card,padding:'44px 24px',textAlign:'center'}}><Ic n={otherMap[t][0]} s={36} c="#C9C4B8"/><div className="hd" style={{fontSize:16,fontWeight:600,marginTop:12}}>{otherMap[t][1]}</div><p style={{fontSize:13,color:'#9A958A',margin:'6px 0 0',lineHeight:1.4}}>Ready to be wired up in development.</p></div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<script>
+  // Compile the JSX above (classic runtime → uses global React.createElement) and run it.
+  (function(){
+    var src = document.getElementById('appsrc').textContent;
+    var code = Babel.transform(src, {presets: [['react', {runtime: 'classic'}]]}).code;
+    (0, eval)(code);
+  })();
+</script>
+</body>
+</html>
